@@ -9,18 +9,44 @@ from PIL import Image
 NOT_SELECTED = 0
 SELECTED = 1
 
-background = Image.open("background.png")
+background = []
+background.append("EMPTY")
+background.append("BW")
+# background.append("SEPIA")
+background.append(Image.open("Filters/Beach.png"))
+background.append(Image.open("Filters/Instagram.png"))
+background.append(Image.open("Filters/Wedding.png"))
+background.append(Image.open("Filters/Movie.png"))
+
+
+FRAME_NUMBER = len(background)
 
 def blend_transparent(face_img, overlay_t_img):
-    face = Image.frombytes("RGB", (1920, 1080), face_img.tostring())
+    face = Image.frombytes("RGB", (1920, 1080), cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB).tostring())
     face.paste(overlay_t_img, (0,0), overlay_t_img)
-    return np.array(face)
+    return cv2.cvtColor(np.array(face), cv2.COLOR_RGB2BGR)
 
-def update_video(window_name, cam):
+# def convert_to_sepia(frame):
+    # b, g, r = cv2.split(frame)
+    #
+    # tr = 0.393*r + 0.769*g + 0.189*b
+    # tg = 0.349*r + 0.686*g + 0.168*b
+    # tb = 0.272*r + 0.534*g + 0.131*b
+    #
+    # return cv2.merge((tb, tg, tr))
+
+def update_video(window_name, cam, frame_index):
     ret, frame = cam.read()
+    frame = cv2.resize(frame, (1920, 1080))
     #vertical flip image
     frame = cv2.flip(frame, 1)
-    frame = blend_transparent(frame, background)
+    if type(background[frame_index]) == str:
+        if background[frame_index] == "BW":
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # elif background[frame_index] == "SEPIA":
+        #     frame = convert_to_sepia(frame)
+    else:
+        frame = blend_transparent(frame, background[frame_index])
     cv2.imshow(window_name, frame)
     key = cv2.waitKey(1) % 0x100
     return frame, key
@@ -60,7 +86,7 @@ def capture_image(window_name, cam, original):
             choice = 2
         elif key == ord("s"): #enter
             if choice == 1:
-                name = datetime.datetime.now().strftime("%Y-%m-%d-%H%M") + ".png"
+                name = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S") + ".png"
                 cv2.imwrite(name, original)
             cont = False
 
@@ -68,18 +94,23 @@ def main(window_name="photomaton"):
     cam = cv2.VideoCapture(1)
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 1920)
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 1080)
-    cam.set(cv2.cv.CV_CAP_PROP_FPS, 60)
+    cam.set(cv2.cv.CV_CAP_PROP_FPS, 30)
     cam.set(cv2.cv.CV_CAP_PROP_BRIGHTNESS, 0.5)
     cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
     cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+    frame_index = 0
     while True:
-        frame, key = update_video(window_name, cam)
+        frame, key = update_video(window_name, cam, frame_index)
         if key == ord('q'):
             cam.release()
             cv2.destroyAllWindows()
             exit()
-        elif key == ord(' '):
+        elif key == ord('s'):
             capture_image(window_name, cam, frame)
+        elif key == ord('d'):
+            frame_index = (frame_index + 1) % FRAME_NUMBER
+        elif key == ord('a'):
+            frame_index = (frame_index - 1) % FRAME_NUMBER
 
 if __name__ == "__main__":
     main()
