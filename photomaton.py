@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
+import os
 import cv2
-import time
-import datetime
 import numpy as np
 from PIL import Image
 
@@ -12,28 +11,23 @@ SELECTED = 1
 background = []
 background.append("EMPTY")
 background.append("BW")
-# background.append("SEPIA")
 background.append(Image.open("Filters/Beach.png"))
 background.append(Image.open("Filters/Instagram.png"))
 background.append(Image.open("Filters/Wedding.png"))
 background.append(Image.open("Filters/Movie.png"))
 
-
 FRAME_NUMBER = len(background)
+
+LEFT_KEY = ord("f")
+CENTER_KEY = ord("k")
+RIGHT_KEY = ord("$")
+
+count = 1
 
 def blend_transparent(face_img, overlay_t_img):
     face = Image.frombytes("RGB", (1920, 1080), cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB).tostring())
     face.paste(overlay_t_img, (0,0), overlay_t_img)
     return cv2.cvtColor(np.array(face), cv2.COLOR_RGB2BGR)
-
-# def convert_to_sepia(frame):
-    # b, g, r = cv2.split(frame)
-    #
-    # tr = 0.393*r + 0.769*g + 0.189*b
-    # tg = 0.349*r + 0.686*g + 0.168*b
-    # tb = 0.272*r + 0.534*g + 0.131*b
-    #
-    # return cv2.merge((tb, tg, tr))
 
 def update_video(window_name, cam, frame_index):
     ret, frame = cam.read()
@@ -43,8 +37,6 @@ def update_video(window_name, cam, frame_index):
     if type(background[frame_index]) == str:
         if background[frame_index] == "BW":
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # elif background[frame_index] == "SEPIA":
-        #     frame = convert_to_sepia(frame)
     else:
         frame = blend_transparent(frame, background[frame_index])
     cv2.imshow(window_name, frame)
@@ -66,6 +58,7 @@ def write_text(frame, text, position, selected):
     cv2.putText(frame, text, (x, y), font, fontsize ,color ,thickness)
 
 def capture_image(window_name, cam, original):
+    global count
     cont = True
     choice = 1
     while cont:
@@ -78,16 +71,21 @@ def capture_image(window_name, cam, original):
             write_text(frame, "Annuler", (1920/2+200, 1000), NOT_SELECTED)
         cv2.imshow(window_name, frame)
         key = None
-        while key not in [ord("a"), ord("d"), ord("s")]:
+        while key not in [LEFT_KEY, CENTER_KEY, RIGHT_KEY]:
             key = cv2.waitKey(1) % 0x100
-        if key == ord("a"): #left
+        if key == LEFT_KEY:
             choice = 1
-        elif key == ord("d"): #right
+        elif key == RIGHT_KEY:
             choice = 2
-        elif key == ord("s"): #enter
+        elif key == CENTER_KEY:
             if choice == 1:
-                name = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S") + ".png"
+                name = os.path.join("Photos", "{:04d}.png".format(count))
+		while os.path.exists(name):
+                    count += 1
+                    name = os.path.join("Photos", "{:04d}.png".format(count))
                 cv2.imwrite(name, original)
+                thumb = cv2.resize(original, (384, 216)) 
+                cv2.imwrite(os.path.join("Photos/mini", "{:04d}.png".format(count)), thumb)
             cont = False
 
 def main(window_name="photomaton"):
@@ -105,11 +103,11 @@ def main(window_name="photomaton"):
             cam.release()
             cv2.destroyAllWindows()
             exit()
-        elif key == ord('s'):
+        elif key == CENTER_KEY:
             capture_image(window_name, cam, frame)
-        elif key == ord('d'):
+        elif key == RIGHT_KEY:
             frame_index = (frame_index + 1) % FRAME_NUMBER
-        elif key == ord('a'):
+        elif key == LEFT_KEY:
             frame_index = (frame_index - 1) % FRAME_NUMBER
 
 if __name__ == "__main__":
